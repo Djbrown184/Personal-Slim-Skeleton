@@ -1,33 +1,27 @@
 <?php
-if (PHP_SAPI == 'cli-server') {
-    // To help the built-in PHP dev server, check if the request was actually for
-    // something which should probably be served as a static file
-    $url  = parse_url($_SERVER['REQUEST_URI']);
-    $file = __DIR__ . $url['path'];
-    if (is_file($file)) {
-        return false;
-    }
-}
 
-require __DIR__ . '/../vendor/autoload.php';
+	use \Psr\Http\Message\ServerRequestInterface as Request;
+	use \Psr\Http\Message\ResponseInterface as Response;
 
-session_start();
+	require dirname(__DIR__) . '/vendor/autoload.php';
 
-// Instantiate the app
-$settings = require __DIR__ . '/../src/settings.php';
-$app = new \Slim\App($settings);
+	$s   = require dirname(__DIR__) . '/system/settings.php';
+	
+	$c = new \Slim\Container($s);
+	
+	$c['notFoundHandler'] = function ($c) {
+		return function ($request, $response) use ($c) {
+			return $response->withStatus(404)->withHeader('Location', '/404');
+		};
+	};
+	
+	$c['cache'] = function () {
+		return new \Slim\HttpCache\CacheProvider();
+	};
+	
+	$app = new \Slim\App($c);
+	$app->add(new \Slim\HttpCache\Cache('public', 86400));
 
-// Set up dependencies
-$dependencies = require __DIR__ . '/../src/dependencies.php';
-$dependencies($app);
-
-// Register middleware
-$middleware = require __DIR__ . '/../src/middleware.php';
-$middleware($app);
-
-// Register routes
-$routes = require __DIR__ . '/../src/routes.php';
-$routes($app);
-
-// Run app
-$app->run();
+	require dirname(__DIR__) . '/system/autoload.php';
+	
+	$app->run();
